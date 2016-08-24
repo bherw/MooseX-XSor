@@ -31,6 +31,9 @@ sub _build_body {
 		# because it can't produce a correctly named boot function, and it dies
 		# when Inline tries to load the .so
 
+		# Inline::C messing around with wrapper functions means we can't copy
+		# aTHX and have to use dTHX in everything instead.
+
 		# Possible solutions:
 		# - Make a custom Inline ILSM that just passes through our code and
 		#   adds the MODULE header
@@ -42,7 +45,7 @@ sub _build_body {
 		# change.
 		'void',
 		"${xs_name}_boot() {",
-			'dXSARGS;',
+			'dTHX; dXSARGS;',
 			'int count;',
 			$self->_build_body_boot,
 		'}',
@@ -50,7 +53,7 @@ sub _build_body {
 		# This arglist is bogus and only here because of Inline::C derping around
 		'void',
 		"$xs_name(SV* foo, ...) {",
-			'dXSARGS;',
+			'dTHX; dXSARGS;',
 			'int count;',
 			@{ $self->body_source },
 		'}'
@@ -109,6 +112,7 @@ sub _compile_options {
 		BOOT              => $self->_xs_prefix . $self->_xs_name . '_boot();',
 		CLEAN_AFTER_BUILD => !$self->options->{debug},
 		PREFIX            => $self->_xs_prefix,
+		pre_head          => '#define PERL_NO_GET_CONTEXT',
 	);
 }
 

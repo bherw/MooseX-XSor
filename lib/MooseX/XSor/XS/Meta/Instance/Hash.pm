@@ -22,14 +22,14 @@ sub xs_deinitialize_slot {
 
 sub xs_get_slot_value {
 	my ($self, $instance_slots, $slot_name) = @_;
-	sprintf '_instance_slot_get(%s, "%s", %d)', $instance_slots, escesc($slot_name),
+	sprintf '_instance_slot_get(aTHX_ %s, "%s", %d)', $instance_slots, escesc($slot_name),
 		length $slot_name;
 }
 
 sub xs_headers {
 	<<END
 	SV*
-	_instance_slot_get(HV* instance_slots, const char* slot_name, int slot_name_len) {
+	_instance_slot_get(pTHX_ HV* instance_slots, const char* slot_name, int slot_name_len) {
 		SV** slotref = hv_fetch(instance_slots, slot_name, slot_name_len, 0);
 		slotref ? *slotref : NULL;
 	}
