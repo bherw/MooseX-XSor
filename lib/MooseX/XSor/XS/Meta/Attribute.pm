@@ -4,6 +4,8 @@ use Moose::Role;
 use MooseX::RelatedClasses;
 use namespace::sweep;
 
+with 'MooseX::XSor::Role::XSGenerator';
+
 # Unfortunately, Moose doesn't let these get traits applied like other metaclasses
 related_classes { Accessor => 'accessor_metaclass', Delegation => 'delegation_metaclass' },
 	namespace => 'MooseX::XSor::XS::Meta::Method';
@@ -96,14 +98,6 @@ sub _xs_boot_env {
 	}
 
 	@env;
-}
-
-sub _xs_call {
-	shift->associated_class->_xs_call(@_);
-}
-
-sub _xs_call_method {
-	shift->associated_class->_xs_call_method(@_);
 }
 
 sub _xs_call_coercion {
@@ -354,10 +348,6 @@ sub _xs_tc_code {
 	#>>>
 
 	return @code;
-}
-
-sub _xs_throw_moose_exception {
-	shift->associated_class->_xs_throw_moose_exception(@_);
 }
 
 sub _xs_throw_tc_validation_failed {
