@@ -68,6 +68,18 @@ sub _xs_call_method {
 	return $self->_xs_call('method', $method, [ $obj, @$args ], $expect);
 }
 
+sub _xs_class_of {
+	my ($self, $class, $meta) = @_;
+
+	#<<<
+	return (
+		$self->_xs_call('pv', \'Class::MOP::class_of', [$class], 'one'),
+		"SV* $meta = POPs;",
+		"SPAGAIN;",
+	);
+	#>>>
+}
+
 sub _xs_throw_moose_exception {
 	my ($self, $type, %args) = @_;
 	my @args;

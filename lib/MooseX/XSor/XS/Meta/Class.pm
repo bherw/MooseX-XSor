@@ -88,18 +88,6 @@ sub _xs_BUILDALL {
 	return @code;
 }
 
-sub _xs_class_of {
-	my ($self, $class, $meta) = @_;
-
-	#<<<
-	return (
-		$self->_xs_call('pv', \'Class::MOP::class_of', [$class], 'one'),
-		"SV* $meta = POPs;",
-		"SPAGAIN;",
-	);
-	#>>>
-}
-
 sub _xs_delegate_scalar {
 	my ($self, $class, $method, $return, $SToff) = @_;
 	$return //= 1;
