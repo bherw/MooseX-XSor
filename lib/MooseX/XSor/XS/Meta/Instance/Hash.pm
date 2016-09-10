@@ -1,7 +1,7 @@
 package MooseX::XSor::XS::Meta::Instance::Hash;
 
 use Moose::Role;
-use MooseX::XSor::Util qw(escesc);
+use MooseX::XSor::Util qw(quotecmeta);
 
 with 'MooseX::XSor::XS::Meta::Instance::XSInlinable';
 
@@ -17,12 +17,13 @@ END
 
 sub xs_deinitialize_slot {
 	my ($self, $instance_slots, $slot_name) = @_;
-	sprintf 'hv_delete(%s, "%s", %d, 0)', $instance_slots, escesc($slot_name), length $slot_name;
+	sprintf 'hv_delete(%s, "%s", %d, 0)', $instance_slots, quotecmeta($slot_name),
+		length $slot_name;
 }
 
 sub xs_get_slot_value {
 	my ($self, $instance_slots, $slot_name) = @_;
-	sprintf '_instance_slot_get(aTHX_ %s, "%s", %d)', $instance_slots, escesc($slot_name),
+	sprintf '_instance_slot_get(aTHX_ %s, "%s", %d)', $instance_slots, quotecmeta($slot_name),
 		length $slot_name;
 }
 
@@ -38,12 +39,12 @@ END
 
 sub xs_is_slot_initialized {
 	my ($self, $instance_slots, $slot_name) = @_;
-	sprintf 'hv_exists(%s, "%s", %d)', $instance_slots, escesc($slot_name), length $slot_name;
+	sprintf 'hv_exists(%s, "%s", %d)', $instance_slots, quotecmeta($slot_name), length $slot_name;
 }
 
 sub xs_set_slot_value {
 	my ($self, $instance_slots, $slot_name, $value) = @_;
-	sprintf '*hv_store(%s, "%s", %d, %s, 0)', $instance_slots, escesc($slot_name),
+	sprintf '*hv_store(%s, "%s", %d, %s, 0)', $instance_slots, quotecmeta($slot_name),
 		length $slot_name, $value;
 }
 

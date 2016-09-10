@@ -2,6 +2,7 @@ package MooseX::XSor::XS::Meta::Class;
 
 use List::Util qw(any);
 use Moose::Role;
+use MooseX::XSor::Util qw(quotecmeta);
 use Try::Tiny;
 
 with 'MooseX::XSor::Role::XSGenerator';
@@ -179,7 +180,9 @@ sub _xs_init_attr {
 
 	if (defined(my $init_arg = $attr->init_arg)) {
 		my @code = (
-			'SV** param = hv_fetch(params, "' . $init_arg . '", ' . length($init_arg) . ', 0);',
+			'SV** param = hv_fetch(params, "'
+				. quotecmeta($init_arg) . '", '
+				. length($init_arg) . ', 0);',
 			'if (param) {',
 			$self->_xs_init_attr_from_constructor($instance, $instance_slots, $attr, $idx),
 			'}',

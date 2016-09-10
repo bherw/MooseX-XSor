@@ -1,7 +1,7 @@
 package MooseX::XSor::Role::XSGenerator;
 
 use Moose::Role;
-use MooseX::XSor::Util qw(escesc);
+use MooseX::XSor::Util qw(quotecmeta);
 
 # XXX: This may as well be Util::XSGeneration
 
@@ -14,7 +14,7 @@ sub _xs_call {
 	my $call_what  = ref $what ? '"' . $$what . '"' : $what;
 	my $error_what = ref $what ? $$what             : $what;
 	my @args
-		= map { ref $_ ? 'sv_2mortal(newSVpv("' . escesc($$_) . '", ' . length($$_) . '))' : $_ }
+		= map { ref $_ ? 'sv_2mortal(newSVpv("' . quotecmeta($$_) . '", ' . length($$_) . '))' : $_ }
 		@$args;
 
 	if ($expect eq 'discard') {

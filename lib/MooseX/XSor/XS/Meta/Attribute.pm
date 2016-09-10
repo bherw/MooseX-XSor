@@ -3,6 +3,7 @@ package MooseX::XSor::XS::Meta::Attribute;
 use Moose::Role;
 use MooseX::RelatedClasses;
 use namespace::sweep;
+use MooseX::XSor::Util qw(quotecmeta);
 
 with 'MooseX::XSor::Role::XSGenerator';
 
@@ -48,10 +49,10 @@ END
 			PUSHMARK(SP);
 			EXTEND(SP, 2);
 			PUSHs(meta);
-			mPUSHs(newSVpvs("@{[ $self->name ]}"));
+			mPUSHs(newSVpvs("@{[ quotecmeta $self->name ]}"));
 			PUTBACK;
-			count = call_method("get_attribute");
-			if (count != 1) croak("Metaclass failed to return attribute for @{[ $self->name ]}");
+			count = call_method("get_attribute", G_SCALAR);
+			if (count != 1) croak("Metaclass failed to return attribute for @{[ quotecmeta $self->name ]}");
 			SPAGAIN;
 			attr = newSVsv(POPs);
 			PUTBACK;
@@ -110,7 +111,7 @@ sub _xs_call_coercion {
 	PUTBACK;
 	
 	count = call_sv($coercion, G_SCALAR);
-	if (count != 1) croak("Coercion for ${class_name}::${attr_name} failed to return anything");
+	if (count != 1) croak("Coercion for ${class_name}::@{[ quotecmeta $attr_name ]} failed to return anything");
 	SPAGAIN;
 	SvREFCNT_dec_NN($value);
 	$value = POPs;
@@ -129,7 +130,7 @@ sub _xs_call_tc_cv {
 	PUTBACK;
 	count = call_sv($tc, G_SCALAR);
 	if (count != 1)
-		croak("Type constraint for ${class_name}::${attr_name} failed to return anything");
+		croak("Type constraint for ${class_name}::@{[ quotecmeta $attr_name ]} failed to return anything");
 	SPAGAIN;
 END
 }
