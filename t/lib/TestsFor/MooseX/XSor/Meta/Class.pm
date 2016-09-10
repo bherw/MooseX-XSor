@@ -9,6 +9,8 @@ use Test::Moose;
 use Test::Fatal;
 with 'Test::Class::Moose::Role::ParameterizedInstances';
 
+use parent qw(MooseX::XSor::Test::Requires);
+
 subtype 'Death', as 'Int', where { $_ == 1 };
 coerce 'Death', from 'Any', via {confess};
 
@@ -67,8 +69,6 @@ END
 	$class;
 	};
 
-my %test_requires;
-
 sub test_buildargs {
 	my ($self)    = @_;
 	my $foo_class = $self->_get_anon_package;
@@ -113,9 +113,7 @@ END
 	}
 }
 
-$test_requires{test_buildargs_warnings} = 'Test::Output';
-
-sub test_buildargs_warnings {
+sub test_buildargs_warnings : Requires(Test::Output) {
 	my ($self) = @_;
 	my $class = $self->_no_attr_class;
 	is(
@@ -198,9 +196,7 @@ END
 	is($baz->baz, 27, 'got right value for baz');
 }
 
-$test_requires{test_constructor_is_not_moose} = 'Test::Output';
-
-sub test_constructor_is_not_moose {
+sub test_constructor_is_not_moose : Requires(Test::Output) {
 	my ($self)               = @_;
 	my $not_moose_class      = $self->_get_anon_package;
 	my $foo_class            = $self->_get_anon_package;
@@ -281,9 +277,7 @@ END
 		q{}, 'no warning when inheriting from a class that has already made itself immutable');
 }
 
-$test_requires{test_constructor_is_wrapped} = 'Test::Output';
-
-sub test_constructor_is_wrapped {
+sub test_constructor_is_wrapped : Requires(Test::Output) {
 	my ($self)           = @_;
 	my $modded_new_class = $self->_get_anon_package;
 	my $foo_class        = $self->_get_anon_package;
@@ -443,9 +437,7 @@ sub test_definition_context {
 END
 }
 
-$test_requires{test_leaks_in_constructor} = 'Test::LeakTrace';
-
-sub test_leaks_in_constructor {
+sub test_leaks_in_constructor : Requires(Test::LeakTrace) {
 	my ($self)    = @_;
 	my $foo_class = $self->_class_with_varied_attrs;
 	my $bar_class = $self->_get_anon_package;
@@ -606,18 +598,6 @@ END
 	@classes;
 }
 
-sub test_setup {
-	my ($self) = @_;
-	my $test_method = $self->test_report->current_method->name;
-
-	if (my $req = $test_requires{$test_method}) {
-		for my $module (ref $req ? @$req : $req) {
-			load_optional_class $module
-				or $self->test_skip("Test requires module '$module' but it's not found");
-		}
-	}
-}
-
 sub test_triggers {
 	my ($self) = @_;
 	my $foo_class = $self->_get_anon_package;
@@ -683,11 +663,6 @@ sub _replace {
 		$str =~ s/$key/$value/g;
 	}
 	$str;
-}
-
-sub _test_requires {
-	my ($self, $package) = @_;
-
 }
 
 1;
