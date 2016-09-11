@@ -7,30 +7,12 @@ use Moose::Util::TypeConstraints;
 use Test::Class::Moose;
 use Test::Moose;
 use Test::Fatal;
-with 'Test::Class::Moose::Role::ParameterizedInstances';
 
 use parent qw(MooseX::XSor::Test::Requires);
+with 'MooseX::XSor::Role::MooseVariantTester';
 
 subtype 'Death', as 'Int', where { $_ == 1 };
 coerce 'Death', from 'Any', via {confess};
-
-has 'moose',
-	is       => 'ro',
-	required => 1;
-
-has '_no_attr_class',
-	is      => 'ro',
-	lazy    => 1,
-	default => sub {
-	my ($self) = @_;
-	my $class = $self->_get_anon_package;
-	$self->_eval_class(<<'END', '#Class' => $class);
-		package #Class;
-		use #Moose;
-		__PACKAGE__->meta->make_immutable;
-END
-	$class;
-	};
 
 has '_class_with_varied_attrs',
 	is      => 'ro',
@@ -640,29 +622,6 @@ END
 
 	is(exception { $foo_class->new(bar => 'bar') }, undef, '... no triggers called');
 
-}
-
-sub _constructor_parameter_sets {
-	map { $_ => { moose => $_ } } qw(MooseX::XSor::PP MooseX::XSor::XS);
-}
-
-sub _eval_class {
-	my ($self, $str, %replacements) = @_;
-	eval _replace($str, %replacements, '#Moose' => $self->moose);
-	die if $@;
-}
-
-sub _get_anon_package {
-	state $i = 0;
-	__PACKAGE__ . '::__ANON__::SERIAL::' . ++$i;
-}
-
-sub _replace {
-	my ($str, %replacements) = @_;
-	while (my ($key, $value) = each %replacements) {
-		$str =~ s/$key/$value/g;
-	}
-	$str;
 }
 
 1;
