@@ -257,8 +257,8 @@ sub _xs_init_attr_using {
 		push @code,
 			(
 			$self->_xs_call_method(
-				"attrs[$idx]",                                \'set_initial_value',
-				[ $attr->_xs_instance_get($instance_slots) ], 'discard'
+				"attrs[$idx]", \'set_initial_value',
+				[ $instance, $attr->_xs_instance_get($instance_slots) ], 'discard'
 			));
 	}
 
