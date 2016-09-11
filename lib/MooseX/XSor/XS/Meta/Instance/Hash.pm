@@ -29,10 +29,10 @@ sub xs_get_slot_value {
 
 sub xs_headers {
 	<<END
-	SV*
+	PERL_STATIC_INLINE SV*
 	_instance_slot_get(pTHX_ HV* instance_slots, const char* slot_name, int slot_name_len) {
 		SV** slotref = hv_fetch(instance_slots, slot_name, slot_name_len, 0);
-		slotref ? *slotref : NULL;
+		return slotref ? *slotref : &PL_sv_undef;
 	}
 END
 }
