@@ -18,45 +18,30 @@ has '_xs_name',
 sub _build_body {
 	my ($self)  = @_;
 	my $class   = ref($self);
-	my $xs_name = $self->_xs_prefix . $self->_xs_name;
+	my $xs_name = $self->_xs_name;
 
 	#<<<
 	my @source = (
 		$self->_build_headers,
 
-		# Inline::C makes XS functions which in turn call these.
-		# XSMODE disables all the extra nonsense it adds, but then we have to
-		# add a MODULE declaration to the code which includes the md5 Inline
-		# gets by hashing the code... meaning XSMODE is completely useless
-		# because it can't produce a correctly named boot function, and it dies
-		# when Inline tries to load the .so
-
-		# Inline::C messing around with wrapper functions means we can't copy
-		# aTHX and have to use dTHX in everything instead.
-
-		# Possible solutions:
-		# - Make a custom Inline ILSM that just passes through our code and
-		#   adds the MODULE header
-		# - Use XS::TCC for development since gcc will get used for immutable
-		#   objects when installed anyways.
+		# Inline::C generates XS functions which in turn call these.
+		# By manually using the XS macros we eliminate the extra functions.
+		"XS($xs_name) {",
+			'dXSARGS;',
+			'int count;',
+			@{ $self->body_source },
+		'}',
 
 		# The boot compile option isn't included in the code that gets hashed
 		# for uniqueness, so it has to go in its own function since it will
-		# change.
-		'void',
-		"${xs_name}_boot() {",
-			'dTHX; dXSARGS;',
+		# change. Adding PERL_STATIC_INLINE hides it from Inline::C.
+		'PERL_STATIC_INLINE void',
+		"${xs_name}_boot(pTHX) {",
+			'dXSARGS;',
 			'int count;',
 			$self->_build_body_boot,
+			qq{newXS("${class}::$xs_name", $xs_name, __FILE__);},
 		'}',
-
-		# This arglist is bogus and only here because of Inline::C derping around
-		'void',
-		"$xs_name(SV* foo, ...) {",
-			'dTHX; dXSARGS;',
-			'int count;',
-			@{ $self->body_source },
-		'}'
 	);
 	#>>>
 
@@ -68,7 +53,7 @@ sub _build_body {
 
 	{
 		no strict 'refs';
-		return \&{ __PACKAGE__ . '::' . $self->_xs_name };
+		return \&{ $class . '::' . $self->_xs_name };
 	}
 }
 
@@ -109,7 +94,7 @@ sub _build_xs_name {
 sub _compile_options {
 	my ($self) = @_;
 	return (
-		BOOT              => $self->_xs_prefix . $self->_xs_name . '_boot();',
+		BOOT              => $self->_xs_name . '_boot(aTHX);',
 		CLEAN_AFTER_BUILD => !$self->options->{debug},
 		PREFIX            => $self->_xs_prefix,
 		pre_head          => '#define PERL_NO_GET_CONTEXT',
