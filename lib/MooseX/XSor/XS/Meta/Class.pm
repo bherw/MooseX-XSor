@@ -229,7 +229,8 @@ sub _xs_init_attr_from_default {
 		: $attr->can('_xs_generate_default')
 		or die "Attr metaclass for @{[ $attr->name ]} doesn't support _xs_generate_default!";
 
-	my ($default, @code) = $attr->$generate_default($instance, "default_$idx", "defaults[$idx]");
+	my $default = 'adefault';
+	my @code = $attr->$generate_default($instance, \$default, "defaults[$idx]");
 	return unless $default;
 
 	return (@code, $self->_xs_init_attr_using($default, $instance, $instance_slots, $attr, $idx));

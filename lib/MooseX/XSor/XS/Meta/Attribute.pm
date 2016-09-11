@@ -172,17 +172,15 @@ sub _xs_generate_default {
 
 	if ($self->has_default) {
 		if ($self->is_default_a_coderef) {
-			return ($default, $self->$call_default($instance, $default, $default_value));
+			return $self->$call_default($instance, $$default, $default_value);
 		}
 		else {
-			return $default_value;
+			$$default = $default_value;
+			return;
 		}
 	}
 	elsif ($self->has_builder) {
 		return (
-			$default,
-
-			# Code
 			$self->_xs_call_method($instance, \'can', [ \($self->builder) ], 'one'),
 			'if (!SvOK(retST(0))) {',
 			$self->_xs_throw_moose_exception(
@@ -195,10 +193,11 @@ sub _xs_generate_default {
 			'}',
 			"SV* builder = POPs;",
 			'PUTBACK;',
-			$self->$call_default($instance, $default, 'builder', ' | G_METHOD'),
+			$self->$call_default($instance, $$default, 'builder', ' | G_METHOD'),
 		);
 	}
 	else {
+		$$default = undef;
 		return;
 	}
 }
