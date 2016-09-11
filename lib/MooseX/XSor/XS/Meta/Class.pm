@@ -296,7 +296,7 @@ sub _xs_instance_weaken {
 sub _xs_new_object {
 	my ($self) = @_;
 	return (
-		$self->_xs_shift_self('class'),
+		$self->_xs_shift_class('class'),
 		'if (sv_isobject(class)) class = sv_ref(0, SvRV(class), 1);',
 		$self->_xs_fallback_constructor('class'),
 		$self->_xs_params('params', 'class'),
@@ -379,24 +379,16 @@ sub _xs_preserve_weak_metaclasses {
 	);
 }
 
-sub _xs_shift_self {
-	my ($self, $self_or_class) = @_;
-	$self_or_class //= 'self';
+sub _xs_shift_class {
+	my ($self, $class) = @_;
 	my @code;
 
 	if ($self->xs_sanity_checking eq 'paranoid') {
 		push @code, 'if (items == 0)',
 			'croak("Call to class or instance method as a function not allowed");';
-
-		if ($self_or_class eq 'self') {
-			push @code, 'if (!sv_isobject(ST(0)))', 'croak("Expected $self to be an object");';
-
-			push @code, $self->get_meta_instance->xs_check_self('ST(0)')
-				if $self->get_meta_instance->can('xs_check_self');
-		}
 	}
 
-	push @code, "SV* $self_or_class = ST(0);";
+	push @code, "SV* $class = ST(0);";
 
 	@code;
 }
