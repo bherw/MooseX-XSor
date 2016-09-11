@@ -146,7 +146,7 @@ sub test_constructor_fallback {
 	my $bar_class = $self->_get_anon_package;
 	my $baz_class = $self->_get_anon_package;
 
-	my $classes = <<'END';
+	$self->_eval_class(<<'END', '#Foo' => $foo_class, '#Bar' => $bar_class, '#Baz' => $baz_class);
 	package #Foo {
 		use #Moose;
 		has foo => (is => 'ro');
@@ -165,7 +165,6 @@ sub test_constructor_fallback {
 		# not making immutable, inheriting Foo's inlined constructor
 	}
 END
-	$self->_eval_class($classes, '#Foo' => $foo_class, '#Bar' => $bar_class, '#Baz' => $baz_class,);
 
 	my $bar = $bar_class->new(foo => 12, bar => 25);
 	is($bar->foo, 12, 'got right value for foo');
@@ -301,6 +300,10 @@ sub test_constructor_type_checking {
 			my $f = $foo_class->new(foo => 10, bar => "Hello World", baz => 10, zot => 4);
 			is($f->moo, 69, "Type coercion works as expected on default");
 			is($f->boo, 69, "Type coercion works as expected on builder");
+
+			is $f->zot, undef, 'zot not set in constructor';
+			$f->zot(1234);
+			is $f->zot, 1234, 'zot set by setter';
 		},
 		undef,
 		"... this passes the constuctor correctly"
@@ -324,9 +327,11 @@ sub test_constructor_type_checking {
 }
 
 sub test_default_values {
-	my ($self) = @_;
+	my ($self)    = @_;
 	my $foo_class = $self->_get_anon_package;
-	$self->_eval_class(<<'END', '#Moose' => $self->moose, '#Foo' => $foo_class);
+	my $bad_class = $self->_get_anon_package;
+	$self->_eval_class(
+		<<'END', '#Moose' => $self->moose, '#Foo' => $foo_class, '#Bad' => $bad_class);
 	package #Foo {
 		use #Moose;
 
@@ -341,6 +346,12 @@ sub test_default_values {
 		has 'buz_l' => (is => 'rw', default => q{"'\\}, lazy => 1);
 		has 'faz_l' => (is => 'rw', default => qq{\0},  lazy => 1);
 
+		has 'default_undef',
+			is        => 'ro',
+			isa       => 'Maybe[Int]',
+			default   => undef,
+			predicate => 'has_default_undef';
+
 		has 'default_cv' => (is => 'rw', default => sub { 2 });
 		has 'default_tc_cv' => (is => 'rw', isa => 'Int', default => sub { 2 });
 		has 'default_lazy_cv' => (is => 'rw', lazy => 1, default => sub { 2 });
@@ -350,6 +361,18 @@ sub test_default_values {
 		has 'builder_lazy' => (is => 'rw', lazy => 1, builder => '_build_builder');
 		has 'builder_lazy_tc' => (is => 'rw', isa => 'Int', lazy => 1, builder => '_build_builder');
 		sub _build_builder { 2 }
+
+		has 'bad_lazy', is => 'rw', isa => 'ArrayRef', lazy => 1, default => sub { 'test' };
+	}
+
+	package #Bad {
+		use #Moose;
+		has 'default_undef_str',
+			is      => 'ro',
+			isa     => 'Str',
+			default => sub {};
+
+		__PACKAGE__->meta->make_immutable;
 	}
 END
 
@@ -373,9 +396,18 @@ END
 	is($foo->buz_l, q{"'\\}, 'default value for buz attr');
 	is($foo->faz_l, qq{\0},  'default value for faz attr');
 
+	ok $foo->has_default_undef;
+	is $foo->default_undef, undef;
+
 	is($foo->$_, 2, "default value for $_ attr")
 		for qw(default_cv default_lazy_cv default_lazy_cv default_lazy_tc_cv
 		builder builder_lazy builder_tc builder_lazy_tc);
+
+	isa_ok exception { $bad_class->new },
+		'Moose::Exception::ValidationFailedForInlineTypeConstraint', 'tc works on defaults';
+
+	isa_ok exception { $foo->bad_lazy },
+		'Moose::Exception::ValidationFailedForInlineTypeConstraint', 'tc works on lazy defaults';
 }
 
 sub test_definition_context {
