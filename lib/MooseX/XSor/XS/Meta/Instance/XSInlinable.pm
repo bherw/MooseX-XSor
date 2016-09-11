@@ -20,14 +20,14 @@ sub xs_rebless_instance_structure {
 sub xs_strengthen_slot_value {
 	my ($self, $instance_slots, $slot_name) = @_;
 	my $access = $self->xs_get_slot_value($instance_slots, $slot_name);
-	my $set = $self->xs_set_slot_value($instance_slots, $slot_name, 'slot');
-	"if (SV* slot = $access) { $set; }";
+	my $set = $self->xs_set_slot_value($instance_slots, $slot_name, 'newSVsv(strengthen_slot)');
+	"{ SV* strengthen_slot; if (strengthen_slot = $access) { $set; } }";
 }
 
 sub xs_weaken_slot_value {
 	my ($self, $instance_slots, $slot_name) = @_;
 	my $access = $self->xs_get_slot_value($instance_slots, $slot_name);
-	"if (SV* slot = $access) { sv_rvweaken(slot); }";
+	"{ SV* weaken_slot; if (weaken_slot = $access) { sv_rvweaken(weaken_slot); } }";
 }
 
 1;
