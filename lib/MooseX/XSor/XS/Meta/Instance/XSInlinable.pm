@@ -115,6 +115,15 @@ Returns statements that create a mortal instance SV* named $instance and the
 slots it contains, named $instance_slots, blessed into $class.
 class must be the name of an SV*, not a class name literal.
 
+=head2 C<xs_define_instance>
+
+	my $from = 'ST(0)';
+	my @code = $mi->xs_define_instance($instance, $instance_slots, $from);
+
+Generates statements that define the instance and instance_slots variables and
+assigns to them. Roughly equivalent to C<my $self = $_[0];>. Must be done
+before attempting to access a slot.
+
 =head2 C<xs_deinitialize_slot>
 
 	SV* val = @{[ $mi->xs_deinitialize_slot($instance_slots, $slot_name) ]};
@@ -129,8 +138,8 @@ in which case NULL will be returned.
 
 	SV* val = @{[ $mi->xs_get_slot_value($instance_slots, $slot_name) ]};
 
-Generates an expression that returns a slot value, or NULL if the slot has not
-been initialized.
+Generates an expression that returns a slot value, or &PL_sv_undef if the slot
+has not been initialized.
 
 =head2 C<xs_is_slot_initialized>
 
@@ -138,7 +147,7 @@ been initialized.
 
 Generates an expression that returns a boolean indicating whether the slot has
 been initialized. Note that if you intend to use the slot value, it's faster to
-use C<xs_get_slot_value> and check if it's NULL, unlike perl inlining.
+use C<xs_get_slot_value> and check if it's defined.
 
 =head2 C<xs_set_slot_value>
 

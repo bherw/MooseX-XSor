@@ -1,21 +1,17 @@
-package MooseX::FastDoes::Meta::Method::Generated;
+package MooseX::XSor::XS::Meta::Method::Generated;
 # ABSTRACT: Abstract base metaclass for generated methods
 
-use Moose;
-use MooseX::ABC;
-
-extends qw(Moose::Meta::Method Class::MOP::Method::Generated);
+use Moose::Role;
 
 has 'associated_metaclass',
 	is       => 'ro',
 	init_arg => 'metaclass',
-	weak_ref => 1,
-	required => 1;
+	weak_ref => 1;
 
 has 'body',
 	is      => 'ro',
 	isa     => 'CodeRef',
-	builder => '_initialize_body',
+	builder => '_build_body',
 	lazy    => 1;
 
 has 'definition_context',
@@ -30,9 +26,9 @@ has 'name',
 	required => 1;
 
 has 'options',
-	is       => 'ro',
-	isa      => 'HashRef',
-	required => 1;
+	is      => 'ro',
+	isa     => 'HashRef',
+	default => sub { {} };
 
 has 'package_name',
 	is      => 'ro',

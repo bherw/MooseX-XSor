@@ -1,15 +1,13 @@
 package MooseX::XSor::XS::Meta::Attribute;
 
 use Moose::Role;
-use MooseX::RelatedClasses;
-use namespace::sweep;
 use MooseX::XSor::Util qw(quotecmeta);
+use aliased 'MooseX::XSor::XS::Meta::Method::Accessor';
 
 with 'MooseX::XSor::Role::XSGenerator';
 
 # Unfortunately, Moose doesn't let these get traits applied like other metaclasses
-related_classes { Accessor => 'accessor_metaclass', Delegation => 'delegation_metaclass' },
-	namespace => 'MooseX::XSor::XS::Meta::Method';
+override accessor_metaclass => sub {Accessor};
 
 # Moose leaves out the compiled type constraint when it can be inlined,
 # but we need it unless it can be xs inlined.
@@ -69,10 +67,10 @@ END
 		PUSHMARK(SP);
 		XPUSHs(attr);
 		PUTBACK;
-		count = call_method("_eval_environment");
+		count = call_method("_eval_environment", G_SCALAR);
 		if (count != 1) croak("Metaattribute _eval_environment returned nothing!");
 		SPAGAIN;
-		HV* env = SvRV(POPs);
+		HV* env = MUTABLE_HV(SvRV(POPs));
 		SvREFCNT_inc_simple_NN(env); // Lazily keeping a ref to its contents
 		PUTBACK;
 END
@@ -88,17 +86,17 @@ sub _xs_boot_env {
 	my ($self) = @_;
 
 	my @env;
-	push @env, 'trigger = SvRV(hv_fetch(env, "$trigger", 8));'           if $self->has_trigger;
-	push @env, 'attr_default = SvRV(hv_fetch(env, "$attr_default", 13);' if $self->has_default;
+	push @env, 'trigger = SvRV(*hv_fetch(env, "$trigger", 8, 0));'            if $self->has_trigger;
+	push @env, 'attr_default = SvRV(*hv_fetch(env, "$attr_default", 13, 0));' if $self->has_default;
 
 	if ($self->has_type_constraint) {
 		my $tc = $self->type_constraint;
 
-		push @env, 'type_constraint = SvRV(hv_fetch(env, "$type_constraint", 16));'
+		push @env, 'type_constraint = SvRV(*hv_fetch(env, "$type_constraint", 16, 0));'
 			unless $tc->can('can_be_xs_inlined') && $tc->can_be_xs_inlined;
-		push @env, 'type_coercion = SvRV(hv_fetch(env, "$type_coercion", 14));'
+		push @env, 'type_coercion = SvRV(*hv_fetch(env, "$type_coercion", 14, 0));'
 			if $tc->has_coercion;
-		push @env, 'type_message = SvRV(hv_fetch(env, "$type_message", 12));';
+		push @env, 'type_message = SvRV(*hv_fetch(env, "$type_message", 13, 0));';
 
 		push @env, $tc->xs_inline_boot if $tc->can('xs_inline_boot');
 	}
@@ -140,6 +138,21 @@ sub _xs_call_tc_cv {
 END
 }
 
+sub _xs_check_lazy {
+	my ($self, $instance, $instance_slots, $tc, $coercion, $message) = @_;
+
+	return unless $self->is_lazy;
+
+	#<<<
+	return (
+		'if (!' . $self->_xs_instance_has($instance_slots) . ') {',
+			$self->_xs_init_from_default(
+				$instance, $instance_slots, 'attr_default', $tc, $coercion, $message, 'lazy'),
+		'}',
+	);
+	#>>>
+}
+
 sub _xs_check_required {
 	my ($self) = @_;
 
@@ -156,6 +169,15 @@ sub _xs_check_required {
 		'}',
 	);
 	#>>>
+}
+
+sub _xs_clear_value {
+	my ($self, $instance_slots) = @_;
+	return (
+		'ST(0) = ' . $self->_xs_instance_clear($instance_slots) . ';',
+		'if (!ST(0)) ST(0) = &PL_sv_undef;',
+		'XSRETURN(1);',
+	);
 }
 
 sub _xs_copy_value {
@@ -226,28 +248,78 @@ sub _xs_get_old_value_for_trigger {
 	return "SV* $old = sv_mortalcopy(" . $self->_xs_instance_get($instance_slots) . ');';
 }
 
-sub _xs_headers {
-	my $self       = shift;
-	my $class      = $self->associated_class->name;
-	my $prefix     = $self->_xs_prefix;
-	my $attr_count = scalar $self->get_all_attributes;
+sub _xs_get_value {
+	my ($self, $instance, $instance_slots, $tc, $coercion, $message) = @_;
 
-	my $type_constraint_headers;
+	$tc       ||= 'type_constraint';
+	$coercion ||= 'type_coercion';
+	$message  ||= 'type_message';
+
+	return (
+		$self->_xs_check_lazy($instance, $instance_slots, $tc, $coercion, $message),
+		$self->_xs_return_auto_deref($self->_xs_instance_get($instance_slots)),
+	);
+}
+
+sub _xs_has_value {
+	my ($self, $instance_slots) = @_;
+	return ('ST(0) = ' . $self->_xs_instance_has($instance_slots) . ' ? &PL_sv_yes : &PL_sv_no;',
+		'XSRETURN(1);',);
+}
+
+sub _xs_headers {
+	my $self = shift;
+
+	my @type_constraint_headers;
 	if ($self->has_type_constraint) {
 		my $tc = $self->type_constraint;
 		if ($tc->can('xs_inline_header')) {
-			$type_constraint_headers = $tc->xs_inline_headers;
+			@type_constraint_headers = $tc->xs_inline_headers;
 		}
 	}
 
-	<<"END"
-	#define retST(offset) PL_stack_base[ax + items + (off)]
-
-	SV *default, *attr, *trigger, *type_coercion, *type_constraint, *type_message;
-	$type_constraint_headers;
+	my @code = <<"END";
+	SV *attr_default, *attr, *trigger, *type_coercion, *type_constraint, *type_message;
+	@type_constraint_headers;
 
 	SV *class_name, *attr, *meta;
 END
+	push @code, $self->associated_class->get_meta_instance->xs_headers;
+
+	@code;
+}
+
+sub _xs_init_from_default {
+	my ($self, $instance, $instance_slots, $default_value, $tc, $coercion, $message, $purpose) = @_;
+
+	unless ($self->has_default || $self->has_builder) {
+		throw_exception('LazyAttributeNeedsADefault', attribute => $self);
+	}
+
+	my $default = 'generated_default';
+	my $value   = 'value';
+	return (
+		$self->_xs_generate_default($instance, \$default, $default_value),
+		"SV* $value = newSVsv($default);",
+		$self->has_type_constraint
+		? $self->_xs_tc_code($value, $tc, $coercion, $message, $purpose)
+		: (),
+		$self->_xs_init_slot($instance, $instance_slots, $value),
+		$self->_xs_weaken_value($instance_slots, $value),
+	);
+}
+
+sub _xs_init_slot {
+	my ($self, $instance, $instance_slots, $value) = @_;
+
+	if ($self->has_initializer) {
+		return $self->_xs_call_method('attr', \'set_initial_value', [ $instance, $value ],
+			'discard');
+	}
+	else {
+		$self->_xs_instance_set($instance_slots, $value) . ';';
+	}
+}
 
 sub _xs_instance_clear {
 	my ($self, $instance_slots) = @_;
@@ -282,6 +354,69 @@ sub _xs_prefix {
 	shift->associated_class->_xs_prefix;
 }
 
+sub _xs_return_auto_deref {
+	my ($self, $ref) = @_;
+
+	my $g_scalar = <<"END";
+	ST(0) = sv_mortalcopy($ref);
+	XSRETURN(1);
+END
+
+	if (!$self->should_auto_deref) {
+		return $g_scalar;
+	}
+
+	#<<<
+	my $tc   = $self->type_constraint;
+	my @code = (
+		'if (GIMME_V != G_ARRAY) {',
+			$g_scalar,
+		'}',
+		"SV* retval = $ref;",
+		"if (!SvOK(retval)) XSRETURN(0);",
+	);
+	#>>>
+
+	if ($tc->is_a_type_of('ArrayRef')) {
+		push @code, <<"END";
+		AV*     av       = MUTABLE_AV(SvRV(retval));
+		SSize_t av_top   = av_top_index(av);
+		int     return_i = 0;
+
+		EXTEND(SP, av_top + 1 - items);
+		for (int i = 0; i <= av_top; i++) {
+			SV** item = av_fetch(av, i, 0);
+			if (item) {
+				ST(return_i++) = sv_mortalcopy(*item);
+			}
+		}
+
+		XSRETURN(return_i);
+END
+	}
+	elsif ($tc->is_a_type_of('HashRef')) {
+		push @code, <<"END";
+		HV* hv       = MUTABLE_HV(SvRV(retval));
+		I32 hv_count = hv_iterinit(hv);
+		int return_i = 0;
+		HE* he;
+
+		EXTEND(SP, hv_count * 2 - items);
+		while (he = hv_iternext(hv)) {
+			ST(return_i++) = HeSVKEY_force(he);
+			ST(return_i++) = sv_mortalcopy(HeVAL(he));
+		}
+
+		XSRETURN(return_i);
+END
+	}
+	else {
+		confess 'Can not auto de-reference the type constraint \'' . $tc->name . '\'';
+	}
+
+	return @code;
+}
+
 sub _xs_set_value {
 	my ($self, $instance, $instance_slots, $value, $tc, $coercion, $message, $purpose) = @_;
 
@@ -290,6 +425,7 @@ sub _xs_set_value {
 	$tc       ||= 'type_constraint';
 	$coercion ||= 'type_coercion';
 	$message  ||= 'type_message';
+	$purpose  ||= '';
 
 	my @code;
 	# if ($self->_writer_value_needs_copy)
@@ -311,8 +447,12 @@ sub _xs_set_value {
 	push @code, $self->_xs_instance_set($instance_slots, $value) . ';',
 		$self->_xs_weaken_value($instance_slots, $value);
 
-	# Constructors do triggers all at once at the end
-	push @code, $self->_xs_trigger($instance, $value, $old) unless $purpose eq 'constructor';
+	unless ($purpose eq 'constructor') {
+		# Constructors do triggers all at once at the end
+		push @code, $self->_xs_trigger($instance, $value, $old);
+
+		push @code, ("ST(0) = $value;", 'XSRETURN(1);',);
+	}
 
 	return @code;
 }
@@ -405,7 +545,7 @@ sub _xs_trigger {
 	EXTEND(SP, 2);
 	PUSHs(instance);
 	PUSHs(@{[ $self->_xs_instance_get('instance_slots') ]});
-	if ($old) XPUSHs($old);
+	if (SvOK($old)) XPUSHs($old);
 	PUTBACK;
 	call_sv(trigger, G_DISCARD);
 	SPAGAIN;

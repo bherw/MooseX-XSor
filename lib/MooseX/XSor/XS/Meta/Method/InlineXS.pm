@@ -106,9 +106,9 @@ sub _xs_prefix {
 	(__PACKAGE__ =~ s{::}{__}gr) . '__';
 }
 
-override _initialize_body => sub {
+sub _initialize_body {
 	$_[0]->{body} = $_[0]->_build_body;
-};
+}
 
 sub _naively_indent {
 	my ($i, @code) = @_;
@@ -123,3 +123,5 @@ sub _naively_indent {
 		$tmp;
 	} map { split /\n/, $_ } @code;
 }
+
+1;

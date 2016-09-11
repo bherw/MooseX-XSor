@@ -435,19 +435,19 @@ sub test_definition_context {
 			qr/called at constructor #Foo::new \(defined at \(eval \d+\) line $ctor_line\)/,
 			"got definition context for the constructor"
 		);
+
+		like(
+			exception { my $f = #Foo->new(foo => 1); $f->foo(2) },
+			qr/called at accessor #Foo::foo \(defined at \(eval \d+\) line $attr_foo_line\)/,
+			"got definition context for the accessor"
+		);
+
+		like(
+			exception { my $f = #Foo->new(foo => 1); $f->baz(2) },
+			qr/called at accessor #Foo::baz of attribute bar \(defined at \(eval \d+\) line $attr_bar_line\)/,
+			"got definition context for the accessor"
+		);
 	}
-
-	like(
-		exception { my $f = #Foo->new(foo => 1); $f->foo(2) },
-		qr/called at accessor #Foo::foo \(defined at \(eval \d+\) line $attr_foo_line\)/,
-		"got definition context for the accessor"
-	);
-
-	like(
-		exception { my $f = #Foo->new(foo => 1); $f->baz(2) },
-		qr/called at accessor #Foo::baz of attribute bar \(defined at \(eval \d+\) line $attr_bar_line\)/,
-		"got definition context for the accessor"
-	);
 END
 }
 

@@ -15,6 +15,24 @@ sub xs_create_instance {
 END
 }
 
+sub xs_define_instance {
+	my ($self, $instance, $instance_slots, $from) = @_;
+
+	my @code;
+
+	if ($self->associated_metaclass->xs_sanity_checking eq 'paranoid') {
+		@code = <<"END";
+		if (items == 0) croak("Call to class or instance method as a function not allowed");
+		if (!sv_isobject($from)) croak("Expected \$self to be an object");
+		if (!SvHROK($from)) croak("Expected \$self to be a hashref");
+END
+	}
+
+	push @code, ("SV* $instance = $from;", "HV* $instance_slots = MUTABLE_HV(SvRV($instance));",);
+
+	@code;
+}
+
 sub xs_deinitialize_slot {
 	my ($self, $instance_slots, $slot_name) = @_;
 	sprintf 'hv_delete(%s, "%s", %d, 0)', $instance_slots, quotecmeta($slot_name),
