@@ -32,6 +32,10 @@ override _post_add_attribute => sub {
 	};
 };
 
+sub _instance_is_xs_inlinable {
+	shift->instance_metaclass->is_xs_inlinable;
+}
+
 sub _xs_boot {
 	my ($self) = @_;
 
@@ -263,6 +267,30 @@ sub _xs_init_attr_using {
 	}
 
 	return @code;
+}
+
+sub _xs_instance_clear {
+	shift->get_meta_instance->xs_deinitialize_slot(@_);
+}
+
+sub _xs_instance_define {
+	shift->get_meta_instance->xs_define_instance(@_);
+}
+
+sub _xs_instance_get {
+	shift->get_meta_instance->xs_get_slot_value(@_);
+}
+
+sub _xs_instance_has {
+	shift->get_meta_instance->xs_is_slot_initialized(@_);
+}
+
+sub _xs_instance_set {
+	shift->get_meta_instance->xs_set_slot_value(@_);
+}
+
+sub _xs_instance_weaken {
+	shift->get_meta_instance->xs_weaken_slot_value(@_);
 }
 
 sub _xs_new_object {

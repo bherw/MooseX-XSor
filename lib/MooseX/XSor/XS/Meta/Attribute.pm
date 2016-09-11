@@ -28,7 +28,12 @@ around _eval_environment => sub {
 
 # XXX: Is this useful for something?
 sub can_be_xs_inlined {
-	return shift->can_be_inlined;
+	my ($self) = @_;
+	$self->can_be_inlined && $self->_instance_is_xs_inlinable;
+}
+
+sub _instance_is_xs_inlinable {
+	shift->associated_class->_instance_is_xs_inlinable;
 }
 
 sub _xs_boot {
@@ -244,20 +249,34 @@ sub _xs_headers {
 
 	SV *class_name, *attr, *meta;
 END
+
+sub _xs_instance_clear {
+	my ($self, $instance_slots) = @_;
+	$self->associated_class->_xs_instance_clear($instance_slots, $self->name);
+}
+
+sub _xs_instance_define {
+	shift->associated_class->_xs_instance_define(@_);
 }
 
 sub _xs_instance_get {
 	my ($self, $instance_slots) = @_;
+	$self->associated_class->_xs_instance_get($instance_slots, $self->name);
+}
 
-	my $mi = $self->associated_class->get_meta_instance;
-	return $mi->xs_get_slot_value($instance_slots, $self->name);
+sub _xs_instance_has {
+	my ($self, $instance_slots) = @_;
+	$self->associated_class->_xs_instance_has($instance_slots, $self->name);
 }
 
 sub _xs_instance_set {
 	my ($self, $instance_slots, $value) = @_;
+	$self->associated_class->_xs_instance_set($instance_slots, $self->name, $value);
+}
 
-	my $mi = $self->associated_class->get_meta_instance;
-	return $mi->xs_set_slot_value($instance_slots, $self->name, $value);
+sub _xs_instance_weaken {
+	my ($self, $instance_slots) = @_;
+	$self->associated_class->_xs_instance_weaken($instance_slots, $self->name);
 }
 
 sub _xs_prefix {
@@ -402,7 +421,7 @@ sub _xs_weaken_value {
 	#<<<
 	return (
 		"if (SvROK($value)) {",
-			$self->get_meta_instance->xs_weaken_slot_value($instance_slots, $self->name) . ';',
+			$self->_xs_instance_weaken($instance_slots) . ';',
 		'}',
 	);
 	#>>>
