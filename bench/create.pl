@@ -8,32 +8,49 @@ use Class::Load 'load_class';
 my @impls = qw(PP XSHash);
 load_class "Point3D::$_" for @impls;
 
+my $count = 10_000;
+
 say "A plain var";
 say "===========";
-cmpthese(-1, {
-	map {
-		my $class = "Point3D::$_";
-		($class => sub { my $p = $class->new(x => 1) })
-	} @impls
-});
+cmpthese(
+	-1,
+	{
+		map {
+			my $class = "Point3D::$_";
+			(
+				$class => sub {
+					for (1 .. $count) { my $p = $class->new(x => 1) }
+				})
+		} @impls
+	});
 say;
 
 say "A Int var";
 say '=========';
-cmpthese(-1, {
-	map {
-		my $class = "Point3D::$_";
-		($class => sub { my $p = $class->new(y => 2) })
-	} @impls
-});
+cmpthese(
+	-1,
+	{
+		map {
+			my $class = "Point3D::$_";
+			(
+				$class => sub {
+					for (1 .. $count) { my $p = $class->new(y => 2) }
+				})
+		} @impls
+	});
 say;
 
 say "Passing a hashref";
 say "=================";
-cmpthese(-1, {
-	map {
-		my $class = "Point3D::$_";
-		($class => sub { my $p = $class->new({x => 1}) })
-	} @impls
-});
+cmpthese(
+	-1,
+	{
+		map {
+			my $class = "Point3D::$_";
+			(
+				$class => sub {
+					for (1 .. $count) { my $p = $class->new({ x => 1 }) }
+				})
+		} @impls
+	});
 say;
