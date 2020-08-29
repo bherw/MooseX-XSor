@@ -14,8 +14,7 @@ This approach has a number of advantages:
 
 - compiling Perl is difficult and not common like compiling python bytecode
 - XS modules with runtime pure-perl fallbacks are a common pattern
-
-- XS accessors are roughly 5 times as fast as pure-perl accessors
+- XS accessors are roughly 2-3 times as fast as pure-perl accessors
 - an XS instance is not limited to HashRef-based instances, but can inherit from any Ref-based class using Perl magic
 
 ## Status
@@ -24,7 +23,6 @@ This approach has a number of advantages:
 - all built-in Moose attribute features are supported
 - all relevant Moose tests passed (though the test harness is currently not working #2)
 - full compatibility with Moose and other HashRef-based OO modules achieved
-- some preliminary benchmarking shows MooseX::XSor has the second fastest Perl OO accessors, second only to Class::XSAccessor, which uses a special ENTERSUB optimization.
 - struct-based instances: in-progress (#1)
 - module build plugin for precompilation: pending (#13)
 
