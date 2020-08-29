@@ -34,9 +34,19 @@ END
 }
 
 sub xs_deinitialize_slot {
-	my ($self, $instance_slots, $slot_name) = @_;
-	sprintf 'hv_delete(%s, "%s", %d, 0)', $instance_slots, quotecmeta($slot_name),
-		length $slot_name;
+	my ($self, $instance_slots, $slot_name, $lvalue) = @_;
+	my $delete = sprintf 'hv_delete(%s, "%s", %d, %s)', $instance_slots, quotecmeta($slot_name),
+		length $slot_name, $lvalue ? '0' : 'G_DISCARD';
+
+	if ($lvalue) {
+		<<"END";
+		$lvalue = $delete;
+		if (!$lvalue) $lvalue = &PL_sv_undef;
+END
+	}
+	else {
+		$delete . ';';
+	}
 }
 
 sub xs_get_slot_value {
@@ -62,7 +72,7 @@ sub xs_is_slot_initialized {
 
 sub xs_set_slot_value {
 	my ($self, $instance_slots, $slot_name, $value) = @_;
-	sprintf '*hv_store(%s, "%s", %d, %s, 0)', $instance_slots, quotecmeta($slot_name),
+	sprintf 'hv_store(%s, "%s", %d, %s, 0);', $instance_slots, quotecmeta($slot_name),
 		length $slot_name, $value;
 }
 
