@@ -266,12 +266,14 @@ sub test_constructor_is_wrapped : Requires(Test::Output) {
 	$self->_eval_class(<<'END', '#ModdedNew' => $modded_new_class, '#Foo' => $foo_class);
 	package #ModdedNew {
 		use #Moose;
+		has 'foo', is => 'rw';
 		before 'new' => sub { };
 	}
 
 	package #Foo {
 		use #Moose;
 		extends '#ModdedNew';
+		has 'bar', is => 'rw';
 	}
 END
 
@@ -280,6 +282,10 @@ END
 		qr/Not inlining 'new' for $foo_class since it has method modifiers which would be lost if it were inlined/,
 		'got a warning that Foo may not have an inlined constructor'
 	);
+
+	my $foo = $foo_class->new(foo => 1, bar => 2);
+	is $foo->foo, 1, 'correct foo';
+	is $foo->bar, 2, 'correct bar';
 }
 
 =pod

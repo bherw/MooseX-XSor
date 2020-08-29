@@ -9,6 +9,15 @@ with 'MooseX::XSor::Role::XSGenerator';
 # Unfortunately, Moose doesn't let these get traits applied like other metaclasses
 override accessor_metaclass => sub {Accessor};
 
+# XSOnly classes get their superclasses' accessors inlined into them,
+# this gets the right metaclass used without passing yet another variable around.
+# This solution stinks but it's only here until codegen gets refactored to use a single context.
+around install_accessors => sub {
+	my ($orig, $self, $inline, %param) = @_;
+	local $self->{associated_class} = $param{class} if $param{class};
+	$self->$orig($inline);
+};
+
 # Moose leaves out the compiled type constraint when it can be inlined,
 # but we need it unless it can be xs inlined.
 around _eval_environment => sub {
@@ -174,8 +183,7 @@ sub _xs_check_required {
 sub _xs_clear_value {
 	my ($self, $instance_slots) = @_;
 	return (
-		'ST(0) = ' . $self->_xs_instance_clear($instance_slots) . ';',
-		'if (!ST(0)) ST(0) = &PL_sv_undef;',
+		$self->_xs_instance_clear($instance_slots, 'ST(0)'),
 		'XSRETURN(1);',
 	);
 }
@@ -322,8 +330,8 @@ sub _xs_init_slot {
 }
 
 sub _xs_instance_clear {
-	my ($self, $instance_slots) = @_;
-	$self->associated_class->_xs_instance_clear($instance_slots, $self->name);
+	my ($self, $instance_slots, $lvalue) = @_;
+	$self->associated_class->_xs_instance_clear($instance_slots, $self->name, $lvalue);
 }
 
 sub _xs_instance_define {
@@ -444,14 +452,16 @@ sub _xs_set_value {
 	push @code, $self->_xs_get_old_value_for_trigger($instance_slots, $old)
 		unless $purpose eq 'constructor';
 
-	push @code, $self->_xs_instance_set($instance_slots, $value) . ';',
+	push @code, $self->_xs_instance_set($instance_slots, $value),
 		$self->_xs_weaken_value($instance_slots, $value);
 
 	unless ($purpose eq 'constructor') {
 		# Constructors do triggers all at once at the end
 		push @code, $self->_xs_trigger($instance, $value, $old);
 
-		push @code, ("ST(0) = $value;", 'XSRETURN(1);',);
+		push @code, (
+			'if (GIMME_V == G_VOID) { XSRETURN(0); }',
+			"ST(0) = sv_mortalcopy($value);", 'XSRETURN(1);',);
 	}
 
 	return @code;

@@ -251,6 +251,9 @@ sub test_autoderef {
 
 	is_deeply [ $o->a_rw ], [@array], 'array in list context';
 	is_deeply { $o->h_rw }, {%hash}, 'hash in list context';
+
+	$o = $class->new(a_ro => [undef, undef]);
+	is_deeply [ $o->a_ro], [undef, undef], 'array of undef';
 }
 
 sub test_coerce_lazy {
@@ -263,6 +266,8 @@ sub test_coerce_lazy {
 
 		has 'array' => (is => 'ro');
 		has 'hash'  => (is => 'ro');
+
+		__PACKAGE__->meta->make_immutable;
 	}
 
 	package #Request {
@@ -281,6 +286,8 @@ sub test_coerce_lazy {
 			coerce  => 1,
 			lazy    => 1,
 			default => sub { [ 'content-type', 'text/html' ] };
+
+		__PACKAGE__->meta->make_immutable;
 	}
 END
 
@@ -416,12 +423,12 @@ END
 		ok $class->meta->has_attribute($attr), "class has '$attr' attribute";
 
 		my $obj = $class->new;
-		ok $obj->has_it;
-		is $obj->it,       1;
-		is $obj->clear_it, 1;
-		ok !$obj->has_it;
+		ok $obj->has_it, 'predicate';
+		is $obj->it,       1, 'accessor - get';
+		is $obj->clear_it, 1, 'clearer return value';
+		ok !$obj->has_it, 'clearer cleared';
 		$obj->it(99);
-		is $obj->it, 99;
+		is $obj->it, 99, 'accessor set';
 
 		$class = $self->_get_anon_package;
 		$self->_eval_class(<<'END', '#Class' => $class, '#attr' => $attr);
@@ -562,8 +569,10 @@ sub test_requires {
 		use #Moose;
 
 		has 'bar' => (is => 'ro', required => 1);
-		has 'baz' => (is => 'rw',  default => 100, required => 1);
-		has 'boo' => (is => 'rw', lazy => 1, default => 50, required => 1);
+		has 'baz' => (is => 'rw', required => 1, default => 100);
+		has 'boo' => (is => 'rw', required => 1, lazy => 1, default => 50);
+
+		__PACKAGE__->meta->make_immutable;
 	}
 END
 
@@ -877,6 +886,8 @@ sub test_writer_generation {
 			writer    => 'set_weak',
 			weak_ref  => 1,
 			predicate => 'has_weak';
+
+		__PACKAGE__->meta->make_immutable;
 	}
 END
 

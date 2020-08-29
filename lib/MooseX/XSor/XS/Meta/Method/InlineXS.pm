@@ -26,6 +26,7 @@ sub _build_body {
 
 		# Inline::C generates XS functions which in turn call these.
 		# By manually using the XS macros we eliminate the extra functions.
+		'// ' . $self->package_name . '::' . $self->name,
 		"XS($xs_name) {",
 			'dXSARGS;',
 			'int count;',
@@ -45,7 +46,7 @@ sub _build_body {
 	);
 	#>>>
 
-	if ($self->options->{debug}) {
+	if ($self->options->{debug} // $ENV{MOOSEX_XSOR_DEBUG}) {
 		@source = _naively_indent(0, @source);
 	}
 
@@ -86,24 +87,23 @@ END
 sub _build_body_boot    { }
 sub _build_body_headers { }
 
+my %names;
 sub _build_xs_name {
 	my ($self) = @_;
-	'__ANON__SERIAL__' . ++$anon_i . '__' . $_[0]->name;
+	my $name = $self->package_name . '__' . $_[0]->name;
+	$name =~ s/:/_/g;
+	$names{$name}++;
+	$name .= '_' . $names{$name} if $names{$name} > 1;
+	$name;
 }
 
 sub _compile_options {
 	my ($self) = @_;
 	return (
 		BOOT              => $self->_xs_name . '_boot(aTHX);',
-		CLEAN_AFTER_BUILD => !$self->options->{debug},
-		PREFIX            => $self->_xs_prefix,
+		CLEAN_AFTER_BUILD => !($self->options->{debug} // $ENV{MOOSEX_XSOR_DEBUG}),
 		pre_head          => '#define PERL_NO_GET_CONTEXT',
 	);
-}
-
-sub _xs_prefix {
-	my ($self) = @_;
-	(__PACKAGE__ =~ s{::}{__}gr) . '__';
 }
 
 sub _initialize_body {
@@ -117,7 +117,7 @@ sub _naively_indent {
 		s/^\s+//;
 		s/\s+$//;
 
-		$i-- if $_ eq '}' or $_ eq ');';
+		$i-- if $_ =~ /^}/ or $_ eq ');';
 		my $tmp = ("\t" x $i) . $_;
 		$i++ if /[\{\(]$/;
 		$tmp;

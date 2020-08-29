@@ -4,6 +4,8 @@ use Moose::Role;
 
 sub requires_immutability {1}
 
+1;
+
 =head2 C<requires_immutability>
 
 A boolean indicating whether the metainstance is able to operate while its

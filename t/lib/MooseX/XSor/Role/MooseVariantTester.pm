@@ -27,7 +27,10 @@ END
 	};
 
 sub _constructor_parameter_sets {
-	map { $_ => { moose => $_ } } qw(MooseX::XSor::PP MooseX::XSor::XS);
+	if (my $mv = $ENV{TEST_MOOSE_VARIANT}) {
+		return ($mv => {moose => $mv});
+	}
+	map { $_ => { moose => $_ } } qw(MooseX::XSor::PP MooseX::XSor::XS Moose::XSor::XS::Struct);
 }
 
 sub _eval_class {

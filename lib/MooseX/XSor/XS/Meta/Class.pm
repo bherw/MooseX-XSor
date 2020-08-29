@@ -3,13 +3,66 @@ package MooseX::XSor::XS::Meta::Class;
 use List::Util qw(any);
 use Moose::Role;
 use MooseX::XSor::Util qw(quotecmeta);
+use Params::Util qw(_INSTANCE);
 use Try::Tiny;
+
+sub XSOnly() {'MooseX::XSor::XS::Meta::Instance::XSOnly'}
 
 with 'MooseX::XSor::Role::XSGenerator';
 
 has 'xs_sanity_checking',
 	is      => 'rw',
 	default => 'paranoid';
+
+# From Moose::Meta::Class
+# Modified to support instances that can only generate accessors once immutable
+override add_attribute => sub {
+    my $self = shift;
+    my $attr =
+        _INSTANCE($_[0], 'Class::MOP::Attribute')
+            ? $_[0]
+            : $self->_process_attribute(@_);
+
+    $self->Class::MOP::Class::add_attribute($attr);
+
+    # RequiresImmutable instances don't install accessors till later
+    if (!$self->_instance_requires_immutability && $attr->can('_check_associated_methods')) {
+        $attr->_check_associated_methods;
+    }
+    return $attr;
+};
+
+
+around new_object => sub {
+	my $orig = shift;
+	my $self = shift;
+
+	if ($self->_instance_requires_immutability && $self->is_mutable) {
+		$self->make_immutable;
+
+		if ($self->has_method('new')) {
+			return $self->name->new(@_);
+		}
+
+		# new wasn't inlined for some reason but the instance's XS proxy methods will work now,
+		# so use the MOP.
+	}
+	
+	return $self->$orig(@_);
+};
+
+# From Class::MOP::Class
+# Modified for XS only instances
+override _inline_accessors => sub {
+    my ($self) = @_;
+    my @attr = $self->get_meta_instance->meta->does_role(XSOnly) ?
+    	$self->get_all_attributes : map {$self->get_attribute($_)} $self->get_attribute_list;
+
+    foreach my $attr (@attr) {
+        $attr->install_accessors(1, class => $self);
+        $attr->_check_associated_methods;
+    }
+};
 
 # From Class::MOP::Class
 # Modified to support instances that can only generate accessors once immutable
@@ -18,22 +71,38 @@ override _post_add_attribute => sub {
 
 	$self->invalidate_meta_instances;
 
-	my $mi = $self->get_meta_instance;
-	return if $mi->can('requires_immutability') && $mi->requires_immutability;
+	# Install accessors later
+	return if $self->_instance_requires_immutability;
 
 	# invalidate package flag here
-	try {
-		local $SIG{__DIE__};
+	#try {
+	#	local $SIG{__DIE__};
 		$attribute->install_accessors;
-	}
-	catch {
-		$self->remove_attribute($attribute->name);
-		die $_;
-	};
+	#}
+	#catch {
+	#	$self->remove_attribute($attribute->name);
+	#	die $_;
+	#};
+};
+
+around _immutable_options => sub {
+	my ($orig, $self, @args) = @_;
+
+	return $self->$orig(
+		debug => !!$ENV{MOOSEX_XSOR_DEBUG},
+		inline_accessors => !!$self->_instance_requires_immutability,
+		@args,
+	);
 };
 
 sub _instance_is_xs_inlinable {
 	shift->instance_metaclass->is_xs_inlinable;
+}
+
+sub _instance_requires_immutability {
+	my ($self) = @_;
+	my $mi = $self->get_meta_instance;
+	return $mi->can('requires_immutability') && $mi->requires_immutability;
 }
 
 sub _xs_boot {
@@ -43,6 +112,8 @@ sub _xs_boot {
 	# This will segfault or something equally bad if moose changes anything
 	my @code = (<<"END");
 	class_name = newSVpvs("@{[ $self->name ]}");
+	class_stash = gv_stashsv(class_name, GV_ADD);
+
 	@{[ $self->_xs_class_of('class_name', 'meta') ]}
 	SvREFCNT_inc_simple_NN(meta);
 
@@ -152,6 +223,7 @@ sub _xs_headers {
 
 	my @code = (<<"END");
 	SV *class_name, *meta;
+	HV* class_stash;
 	SV **defaults, **attrs, **triggers, **type_coercions,
 		**type_constraint_bodies, **type_constraint_messages;
 END
@@ -407,7 +479,7 @@ sub _xs_slot_initializer {
 	(
 		'// ' . $attr->name,
 		'{',
-			$self->get_meta_instance->xs_initialize_slot($instance_slots, $attr),
+			$self->get_meta_instance->xs_initialize_slot($instance_slots, $attr->name),
 			$self->_xs_init_attr($instance, $instance_slots, $attr, $idx),
 		'}',
 	);
