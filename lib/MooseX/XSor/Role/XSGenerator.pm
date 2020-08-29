@@ -83,7 +83,7 @@ sub _xs_class_of {
 sub _xs_throw_moose_exception {
 	my ($self, $type, %args) = @_;
 	my @args;
-	for (keys %args) {
+	for (sort keys %args) {
 		push @args, \$_, $args{$_};
 	}
 
