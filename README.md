@@ -2,6 +2,10 @@
 
 A Moose extension producing fast XS accessors (and constructors)
 
+## Usage
+
+Precompilation is not yet supported, but dynamic generation works. Simply replace `use Moose` imports with `use MooseX::XSor` and use `__PACKAGE__->meta->make_immutable;` to get the C methods
+
 ## Why?!
 
 Moose is notoriously slow to start. It needs to initialize all of the Class::MOP meta-object protocol, then use the MOP to construct itself, then any extensions, and finally it's ready to start compiling and installing generated Perl methods for your classes. This is fine for long-running processes, but painful for CLI apps like Dist::Zilla.
